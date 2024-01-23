@@ -1,0 +1,59 @@
+---
+# made based off of https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
+- name: Install docker and all of the needed things
+  gather_facts: true
+  hosts: docker_hosts
+  become: true
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - software-properties-common
+        update_cache: true
+    # this directory usually always exists but including anyway since its in the instructions
+    - name: Create directory for docker key
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+    - name: Install docker gpg key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        keyring: /etc/apt/keyrings/docker.gpg
+    - name: Add docker to repos
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker.list
+    - name: Install docker related packages
+      ansible.builtin.apt:
+        pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        update_cache: true
+    - name: Add current user to docker group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+    - name: Enable and start docker service
+      ansible.builtin.systemd_service:
+        enabled: true
+        state: started
+        name: "{{ item }}"
+      loop:
+        - docker.service
+        - containerd.service
+    - name: Run docker hello world
+      ansible.builtin.command: docker run hello-world
+      register: hello_world_out
+    - name: Print hellow world output
+      ansible.builtin.debug:
+        var: hello_world_out
